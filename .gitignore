@@ -1,0 +1,8 @@
+# Build
+build/
+
+# Cache
+.cache/
+
+# Logs
+*.log

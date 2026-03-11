@@ -1,0 +1,227 @@
+#include "agent.hpp"
+#include "tools/read_tool.hpp"
+#include "tools/write_tool.hpp"
+#include "tools/edit_tool.hpp"
+#include "tools/bash_tool.hpp"
+#include "tools/glob_tool.hpp"
+#include "tools/grep_tool.hpp"
+#include <iostream>
+#include <filesystem>
+#include <cstdlib>
+
+Agent::Agent() : messages_(json::array()) {
+    register_tools();
+}
+
+void Agent::register_tools() {
+    tool_registry_.register_tool(std::make_unique<ReadTool>());
+    tool_registry_.register_tool(std::make_unique<WriteTool>());
+    tool_registry_.register_tool(std::make_unique<EditTool>());
+    tool_registry_.register_tool(std::make_unique<BashTool>());
+    tool_registry_.register_tool(std::make_unique<GlobTool>());
+    tool_registry_.register_tool(std::make_unique<GrepTool>());
+}
+
+json Agent::build_system_prompt() const {
+    json system = json::array();
+
+    // Block 1: Role definition
+    system.push_back({
+        {"type", "text"},
+        {"text", "You are cc.cpp, a CLI-based AI coding assistant."}
+    });
+
+    // Block 2: Main instructions (the big one)
+    std::string instructions = R"(
+You are an interactive agent that helps users with software engineering tasks. Use the instructions below and the tools available to you to assist the user.
+
+# System
+ - All text you output outside of tool use is displayed to the user. Output text to communicate with the user. You can use Github-flavored markdown for formatting.
+ - Tool results and user messages may include <system-reminder> tags. Tags contain information from the system.
+ - The system will automatically compress prior messages in your conversation as it approaches context limits.
+
+# Doing tasks
+ - The user will primarily request you to perform software engineering tasks. These may include solving bugs, adding new functionality, refactoring code, explaining code, and more.
+ - You are highly capable and often allow users to complete ambitious tasks that would otherwise be too complex or take too long.
+ - In general, do not propose changes to code you haven't read. If a user asks about or wants you to modify a file, read it first.
+ - Do not create files unless they're absolutely necessary. Generally prefer editing an existing file to creating a new one.
+ - If your approach is blocked, do not attempt to brute force your way to the outcome. Consider alternative approaches or ask the user.
+ - Be careful not to introduce security vulnerabilities. Prioritize writing safe, secure, and correct code.
+ - Avoid over-engineering. Only make changes that are directly requested or clearly necessary. Keep solutions simple and focused.
+  - Don't add features, refactor code, or make "improvements" beyond what was asked.
+  - Don't add error handling or validation for scenarios that can't happen.
+  - Don't create helpers or abstractions for one-time operations.
+
+# Executing actions with care
+ - Carefully consider the reversibility and blast radius of actions.
+ - For actions that are hard to reverse, affect shared systems, or could be destructive, check with the user before proceeding.
+ - Examples of risky actions that warrant user confirmation:
+  - Destructive operations: deleting files/branches, rm -rf, overwriting uncommitted changes
+  - Hard-to-reverse operations: force-pushing, git reset --hard
+  - Actions visible to others: pushing code, creating/commenting on PRs or issues
+
+# Using your tools
+ - Do NOT use Bash when a dedicated tool is available:
+  - To read files use Read instead of cat/head/tail
+  - To edit files use Edit instead of sed/awk
+  - To create files use Write instead of echo/cat heredoc
+  - To search for files use Glob instead of find/ls
+  - To search file contents use Grep instead of grep/rg
+  - Reserve Bash exclusively for system commands that require shell execution.
+ - You can call multiple tools in a single response. Make independent tool calls in parallel.
+
+# Tone and style
+ - Only use emojis if the user explicitly requests it.
+ - Your responses should be short and concise.
+ - When referencing code include the pattern file_path:line_number.
+
+# Environment
+ - Working directory: )" + std::filesystem::current_path().string() + R"(
+ - Platform: )"
+#if defined(__APPLE__)
+    + "macOS"
+#elif defined(__linux__)
+    + "Linux"
+#else
+    + "Unknown"
+#endif
+    + R"(
+ - Shell: )" + std::string(std::getenv("SHELL") ? std::getenv("SHELL") : "unknown") + "\n";
+
+    system.push_back({
+        {"type", "text"},
+        {"text", instructions}
+    });
+
+    return system;
+}
+
+json Agent::build_user_message(const std::string& user_input) const {
+    json content = json::array();
+
+    // Inject memory (CC.md) as system-reminder
+    std::string memory = memory_manager_.build_memory_prompt();
+    if (!memory.empty()) {
+        content.push_back({
+            {"type", "text"},
+            {"text", "<system-reminder>\n# Project Instructions\n" + memory + "</system-reminder>\n"}
+        });
+    }
+
+    // User's actual text
+    content.push_back({
+        {"type", "text"},
+        {"text", user_input}
+    });
+
+    return {
+        {"role", "user"},
+        {"content", content}
+    };
+}
+
+void Agent::process(const std::string& user_input) {
+    // Add user message with system-reminder injections
+    messages_.push_back(build_user_message(user_input));
+    agent_loop();
+}
+
+json Agent::execute_tool_call(const json& tool_use_block) {
+    std::string tool_name = tool_use_block["name"].get<std::string>();
+    std::string tool_id = tool_use_block["id"].get<std::string>();
+    json input = tool_use_block.value("input", json::object());
+
+    // Permission check
+    auto* tool = tool_registry_.get(tool_name);
+    if (tool) {
+        if (!permission_manager_.check_and_request(tool_name, input, tool->permission_level())) {
+            return {
+                {"type", "tool_result"},
+                {"tool_use_id", tool_id},
+                {"content", "Permission denied by user."},
+                {"is_error", true}
+            };
+        }
+    }
+
+    // Print tool call info
+    std::cout << "\033[1;34m[" << tool_name << "]\033[0m ";
+    if (input.contains("file_path")) {
+        std::cout << input["file_path"].get<std::string>();
+    } else if (input.contains("command")) {
+        std::string cmd = input["command"].get<std::string>();
+        if (cmd.length() > 80) cmd = cmd.substr(0, 80) + "...";
+        std::cout << cmd;
+    } else if (input.contains("pattern")) {
+        std::cout << input["pattern"].get<std::string>();
+    }
+    std::cout << "\n";
+
+    // Execute with exception handling for missing params etc.
+    ToolResult result;
+    try {
+        result = tool_registry_.execute(tool_name, input);
+    } catch (const std::exception& e) {
+        result = {std::string("Error: ") + e.what(), true};
+    }
+
+    if (result.is_error) {
+        std::cout << "\033[1;31m  Error: " << result.content.substr(0, 200) << "\033[0m\n";
+    }
+
+    return {
+        {"type", "tool_result"},
+        {"tool_use_id", tool_id},
+        {"content", result.content},
+        {"is_error", result.is_error}
+    };
+}
+
+void Agent::agent_loop() {
+    const int max_iterations = 50;
+
+    for (int iter = 0; iter < max_iterations; iter++) {
+        json system_prompt = build_system_prompt();
+        json tools = tool_registry_.get_tool_definitions();
+
+        ApiResponse response;
+        try {
+            response = api_client_.chat(system_prompt, messages_, tools,
+                [](const std::string& text) {
+                    std::cout << text;
+                    std::cout.flush();
+                }
+            );
+        } catch (const std::exception& e) {
+            std::cerr << "\n\033[1;31mAPI Error: " << e.what() << "\033[0m\n";
+            return;
+        }
+
+        // Add assistant message to history
+        messages_.push_back(response.message);
+
+        // Check if there are tool calls
+        bool has_tool_use = false;
+        json tool_results = json::array();
+
+        for (auto& block : response.message["content"]) {
+            if (block["type"] == "tool_use") {
+                has_tool_use = true;
+                tool_results.push_back(execute_tool_call(block));
+            }
+        }
+
+        if (!has_tool_use) {
+            std::cout << "\n";
+            return;
+        }
+
+        // Add tool results to history and continue loop
+        messages_.push_back({
+            {"role", "user"},
+            {"content", tool_results}
+        });
+    }
+
+    std::cerr << "\n\033[1;33mWarning: Agent loop reached maximum iterations.\033[0m\n";
+}
