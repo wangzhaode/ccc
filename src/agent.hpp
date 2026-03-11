@@ -16,6 +16,9 @@ public:
     // Process a user message through the agent loop
     void process(const std::string& user_input);
 
+    // Getters for UI display
+    std::string model() const { return api_client_.model(); }
+
 private:
     ApiClient api_client_;
     ToolRegistry tool_registry_;

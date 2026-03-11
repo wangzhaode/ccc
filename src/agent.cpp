@@ -241,6 +241,7 @@ void Agent::agent_loop() {
         }
 
         ui::stop_spinner();
+        ui::end_assistant_response();
         auto end_time = std::chrono::steady_clock::now();
         std::chrono::duration<double> total_duration = end_time - start_time;
         if (first_token) {

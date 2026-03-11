@@ -43,19 +43,19 @@ FetchContent_MakeAvailable(httplib json ftxui)
 
 # Main executable
 file(GLOB_RECURSE SOURCES src/*.cpp)
-add_executable(cc ${SOURCES})
-target_include_directories(cc PRIVATE src include)
-target_link_libraries(cc PRIVATE httplib::httplib nlohmann_json::nlohmann_json ftxui::screen ftxui::dom ftxui::component)
+add_executable(ccc ${SOURCES})
+target_include_directories(ccc PRIVATE src include)
+target_link_libraries(ccc PRIVATE httplib::httplib nlohmann_json::nlohmann_json ftxui::screen ftxui::dom ftxui::component)
 
 if(OPENSSL_FOUND)
-    target_link_libraries(cc PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+    target_link_libraries(ccc PRIVATE OpenSSL::SSL OpenSSL::Crypto)
 endif()
 
 # Platform-specific settings
 if(APPLE)
     find_library(SECURITY_FRAMEWORK Security)
     if(SECURITY_FRAMEWORK)
-        target_link_libraries(cc PRIVATE ${SECURITY_FRAMEWORK})
+        target_link_libraries(ccc PRIVATE ${SECURITY_FRAMEWORK})
     endif()
 endif()
 

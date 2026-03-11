@@ -22,6 +22,7 @@ void stop_spinner();
 
 // Agent streaming output
 void append_text(const std::string& text);
+void end_assistant_response();
 void print_assistant_stats(const std::string& stats);
 
 // Permission
