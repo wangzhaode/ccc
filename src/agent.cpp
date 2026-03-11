@@ -218,27 +218,39 @@ void Agent::agent_loop() {
 
         ui::start_spinner("Thinking...");
 
+        auto start_time = std::chrono::steady_clock::now();
+        std::chrono::duration<double> thought_duration{0};
+
         ApiResponse response;
         bool first_token = true;
         try {
             response = api_client_.chat(system_prompt, messages_, tools,
-                [&first_token](const std::string& text) {
+                [&first_token, &thought_duration, start_time](const std::string& text) {
                     if (first_token) {
                         ui::stop_spinner();
                         first_token = false;
+                        thought_duration = std::chrono::steady_clock::now() - start_time;
                     }
-                    std::cout << text;
-                    std::cout.flush();
+                    ui::append_text(text);
                 }
             );
         } catch (const std::exception& e) {
             ui::stop_spinner();
-            std::cerr << "\n";
             ui::print_api_error(e.what());
             return;
         }
 
         ui::stop_spinner();
+        auto end_time = std::chrono::steady_clock::now();
+        std::chrono::duration<double> total_duration = end_time - start_time;
+        if (first_token) {
+            thought_duration = total_duration;
+        }
+
+        char stats_buf[128];
+        snprintf(stats_buf, sizeof(stats_buf), "(%.1fs \xc2\xb7 \xe2\x86\x91 %d tokens \xc2\xb7 \xe2\x86\x93 %d tokens \xc2\xb7 thought for %.1fs)",
+                 total_duration.count(), response.input_tokens, response.output_tokens, thought_duration.count());
+        ui::print_assistant_stats(stats_buf);
 
         // Add assistant message to history
         messages_.push_back(response.message);
@@ -255,7 +267,6 @@ void Agent::agent_loop() {
         }
 
         if (!has_tool_use) {
-            std::cout << "\n";
             return;
         }
 
@@ -266,6 +277,5 @@ void Agent::agent_loop() {
         });
     }
 
-    std::cerr << "\n";
     ui::print_warning("Agent loop reached maximum iterations.");
 }

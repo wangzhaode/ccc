@@ -45,7 +45,7 @@ FetchContent_MakeAvailable(httplib json ftxui)
 file(GLOB_RECURSE SOURCES src/*.cpp)
 add_executable(cc ${SOURCES})
 target_include_directories(cc PRIVATE src include)
-target_link_libraries(cc PRIVATE httplib::httplib nlohmann_json::nlohmann_json ftxui::screen ftxui::dom)
+target_link_libraries(cc PRIVATE httplib::httplib nlohmann_json::nlohmann_json ftxui::screen ftxui::dom ftxui::component)
 
 if(OPENSSL_FOUND)
     target_link_libraries(cc PRIVATE OpenSSL::SSL OpenSSL::Crypto)

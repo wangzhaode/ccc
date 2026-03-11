@@ -30,14 +30,7 @@ bool PermissionManager::prompt_user(const std::string& tool_name, const json& pa
         }
     }
 
-    ui::print_permission_header(tool_name, detail);
-    ui::print_permission_prompt(tool_name);
-
-    std::string input;
-    std::getline(std::cin, input);
-
-    if (input.empty()) return false;
-    char choice = std::tolower(input[0]);
+    char choice = ui::prompt_permission(tool_name, detail);
 
     if (choice == 'a') {
         always_allowed_.insert(tool_name);
