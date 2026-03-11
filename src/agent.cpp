@@ -9,6 +9,12 @@
 #include <filesystem>
 #include <cstdlib>
 
+static bool params_present(const json& input, const std::string& key) {
+    if (!input.contains(key)) return false;
+    // Also reject null values
+    return !input[key].is_null();
+}
+
 Agent::Agent() : messages_(json::array()) {
     register_tools();
 }
@@ -131,17 +137,43 @@ json Agent::execute_tool_call(const json& tool_use_block) {
     std::string tool_id = tool_use_block["id"].get<std::string>();
     json input = tool_use_block.value("input", json::object());
 
-    // Permission check
+    auto make_error = [&](const std::string& msg) -> json {
+        std::cout << "\033[1;34m[" << tool_name << "]\033[0m\n";
+        std::cout << "\033[1;31m  Error: " << msg.substr(0, 200) << "\033[0m\n";
+        return {
+            {"type", "tool_result"},
+            {"tool_use_id", tool_id},
+            {"content", msg},
+            {"is_error", true}
+        };
+    };
+
+    // Check tool exists
     auto* tool = tool_registry_.get(tool_name);
-    if (tool) {
-        if (!permission_manager_.check_and_request(tool_name, input, tool->permission_level())) {
-            return {
-                {"type", "tool_result"},
-                {"tool_use_id", tool_id},
-                {"content", "Permission denied by user."},
-                {"is_error", true}
-            };
+    if (!tool) {
+        return make_error("Unknown tool: " + tool_name);
+    }
+
+    // Validate required parameters before permission check
+    json tool_schema = tool->schema();
+    if (tool_schema.contains("required") && tool_schema["required"].is_array()) {
+        for (auto& req : tool_schema["required"]) {
+            std::string key = req.get<std::string>();
+            if (!params_present(input, key)) {
+                return make_error("Missing required parameter: \"" + key + "\". "
+                                  "You must provide the \"" + key + "\" parameter.");
+            }
         }
+    }
+
+    // Permission check (only after params are valid)
+    if (!permission_manager_.check_and_request(tool_name, input, tool->permission_level())) {
+        return {
+            {"type", "tool_result"},
+            {"tool_use_id", tool_id},
+            {"content", "Permission denied by user."},
+            {"is_error", true}
+        };
     }
 
     // Print tool call info
@@ -157,12 +189,12 @@ json Agent::execute_tool_call(const json& tool_use_block) {
     }
     std::cout << "\n";
 
-    // Execute with exception handling for missing params etc.
+    // Execute with exception handling
     ToolResult result;
     try {
-        result = tool_registry_.execute(tool_name, input);
+        result = tool->execute(input);
     } catch (const std::exception& e) {
-        result = {std::string("Error: ") + e.what(), true};
+        result = {e.what(), true};
     }
 
     if (result.is_error) {
