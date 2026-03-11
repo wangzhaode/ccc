@@ -1,4 +1,5 @@
 #include "agent.hpp"
+#include "ui.hpp"
 #include "tools/read_tool.hpp"
 #include "tools/write_tool.hpp"
 #include "tools/edit_tool.hpp"
@@ -138,8 +139,8 @@ json Agent::execute_tool_call(const json& tool_use_block) {
     json input = tool_use_block.value("input", json::object());
 
     auto make_error = [&](const std::string& msg) -> json {
-        std::cout << "\033[1;34m[" << tool_name << "]\033[0m\n";
-        std::cout << "\033[1;31m  Error: " << msg.substr(0, 200) << "\033[0m\n";
+        ui::print_tool_call(tool_name, "");
+        ui::print_tool_error(msg);
         return {
             {"type", "tool_result"},
             {"tool_use_id", tool_id},
@@ -177,17 +178,16 @@ json Agent::execute_tool_call(const json& tool_use_block) {
     }
 
     // Print tool call info
-    std::cout << "\033[1;34m[" << tool_name << "]\033[0m ";
+    std::string detail;
     if (input.contains("file_path")) {
-        std::cout << input["file_path"].get<std::string>();
+        detail = input["file_path"].get<std::string>();
     } else if (input.contains("command")) {
-        std::string cmd = input["command"].get<std::string>();
-        if (cmd.length() > 80) cmd = cmd.substr(0, 80) + "...";
-        std::cout << cmd;
+        detail = input["command"].get<std::string>();
+        if (detail.length() > 80) detail = detail.substr(0, 80) + "...";
     } else if (input.contains("pattern")) {
-        std::cout << input["pattern"].get<std::string>();
+        detail = input["pattern"].get<std::string>();
     }
-    std::cout << "\n";
+    ui::print_tool_call(tool_name, detail);
 
     // Execute with exception handling
     ToolResult result;
@@ -198,7 +198,7 @@ json Agent::execute_tool_call(const json& tool_use_block) {
     }
 
     if (result.is_error) {
-        std::cout << "\033[1;31m  Error: " << result.content.substr(0, 200) << "\033[0m\n";
+        ui::print_tool_error(result.content);
     }
 
     return {
@@ -216,18 +216,29 @@ void Agent::agent_loop() {
         json system_prompt = build_system_prompt();
         json tools = tool_registry_.get_tool_definitions();
 
+        ui::start_spinner("Thinking...");
+
         ApiResponse response;
+        bool first_token = true;
         try {
             response = api_client_.chat(system_prompt, messages_, tools,
-                [](const std::string& text) {
+                [&first_token](const std::string& text) {
+                    if (first_token) {
+                        ui::stop_spinner();
+                        first_token = false;
+                    }
                     std::cout << text;
                     std::cout.flush();
                 }
             );
         } catch (const std::exception& e) {
-            std::cerr << "\n\033[1;31mAPI Error: " << e.what() << "\033[0m\n";
+            ui::stop_spinner();
+            std::cerr << "\n";
+            ui::print_api_error(e.what());
             return;
         }
+
+        ui::stop_spinner();
 
         // Add assistant message to history
         messages_.push_back(response.message);
@@ -255,5 +266,6 @@ void Agent::agent_loop() {
         });
     }
 
-    std::cerr << "\n\033[1;33mWarning: Agent loop reached maximum iterations.\033[0m\n";
+    std::cerr << "\n";
+    ui::print_warning("Agent loop reached maximum iterations.");
 }

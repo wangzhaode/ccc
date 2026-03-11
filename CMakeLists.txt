@@ -29,13 +29,23 @@ FetchContent_Declare(
     GIT_TAG v3.11.3
 )
 
-FetchContent_MakeAvailable(httplib json)
+FetchContent_Declare(
+    ftxui
+    GIT_REPOSITORY https://github.com/ArthurSonzogni/FTXUI.git
+    GIT_TAG v5.0.0
+)
+
+set(FTXUI_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(FTXUI_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(FTXUI_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+
+FetchContent_MakeAvailable(httplib json ftxui)
 
 # Main executable
 file(GLOB_RECURSE SOURCES src/*.cpp)
 add_executable(cc ${SOURCES})
 target_include_directories(cc PRIVATE src include)
-target_link_libraries(cc PRIVATE httplib::httplib nlohmann_json::nlohmann_json)
+target_link_libraries(cc PRIVATE httplib::httplib nlohmann_json::nlohmann_json ftxui::screen ftxui::dom)
 
 if(OPENSSL_FOUND)
     target_link_libraries(cc PRIVATE OpenSSL::SSL OpenSSL::Crypto)

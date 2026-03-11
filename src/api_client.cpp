@@ -1,4 +1,5 @@
 #include "api_client.hpp"
+#include "ui.hpp"
 #include <httplib.h>
 #include <iostream>
 #include <fstream>
@@ -93,7 +94,7 @@ std::string ApiClient::system_to_string(const json& system_prompt) {
 }
 
 static void debug_print(const std::string& label, const std::string& content) {
-    std::cerr << "\033[1;35m[DEBUG " << label << "]\033[0m\n" << content << "\n\033[1;35m[/DEBUG]\033[0m\n";
+    ui::print_debug(label, content);
 }
 
 ApiResponse ApiClient::chat(

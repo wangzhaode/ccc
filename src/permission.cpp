@@ -1,4 +1,5 @@
 #include "permission.hpp"
+#include "ui.hpp"
 #include <iostream>
 
 bool PermissionManager::check_and_request(const std::string& tool_name, const json& params, PermissionLevel level) {
@@ -16,25 +17,21 @@ bool PermissionManager::check_and_request(const std::string& tool_name, const js
 }
 
 bool PermissionManager::prompt_user(const std::string& tool_name, const json& params) {
-    std::cout << "\n\033[1;33m--- Permission Request ---\033[0m\n";
-    std::cout << "Tool: \033[1m" << tool_name << "\033[0m\n";
-
-    // Show relevant parameters
+    // Build detail string for the permission box
+    std::string detail;
     if (tool_name == "Bash" && params.contains("command")) {
-        std::cout << "Command: " << params["command"].get<std::string>() << "\n";
+        detail = "Command: " + params["command"].get<std::string>();
     } else if ((tool_name == "Write" || tool_name == "Edit" || tool_name == "Read") && params.contains("file_path")) {
-        std::cout << "File: " << params["file_path"].get<std::string>() << "\n";
-        if (tool_name == "Edit") {
-            if (params.contains("old_string")) {
-                std::string old_str = params["old_string"].get<std::string>();
-                if (old_str.length() > 100) old_str = old_str.substr(0, 100) + "...";
-                std::cout << "Replace: " << old_str << "\n";
-            }
+        detail = "File: " + params["file_path"].get<std::string>();
+        if (tool_name == "Edit" && params.contains("old_string")) {
+            std::string old_str = params["old_string"].get<std::string>();
+            if (old_str.length() > 100) old_str = old_str.substr(0, 100) + "...";
+            detail += "\nReplace: " + old_str;
         }
     }
 
-    std::cout << "\033[1;33m[y]es / [n]o / [a]lways allow " << tool_name << ": \033[0m";
-    std::cout.flush();
+    ui::print_permission_header(tool_name, detail);
+    ui::print_permission_prompt(tool_name);
 
     std::string input;
     std::getline(std::cin, input);
