@@ -6,7 +6,9 @@
 #include "tools/bash_tool.hpp"
 #include "tools/glob_tool.hpp"
 #include "tools/grep_tool.hpp"
-#include <iostream>
+#include "tools/task_create_tool.hpp"
+#include "tools/task_update_tool.hpp"
+#include "tools/task_list_tool.hpp"
 #include <filesystem>
 #include <cstdlib>
 
@@ -27,6 +29,9 @@ void Agent::register_tools() {
     tool_registry_.register_tool(std::make_unique<BashTool>());
     tool_registry_.register_tool(std::make_unique<GlobTool>());
     tool_registry_.register_tool(std::make_unique<GrepTool>());
+    tool_registry_.register_tool(std::make_unique<TaskCreateTool>(&task_manager_));
+    tool_registry_.register_tool(std::make_unique<TaskUpdateTool>(&task_manager_));
+    tool_registry_.register_tool(std::make_unique<TaskListTool>(&task_manager_));
 }
 
 json Agent::build_system_prompt() const {
@@ -77,6 +82,10 @@ You are an interactive agent that helps users with software engineering tasks. U
   - Reserve Bash exclusively for system commands that require shell execution.
  - You can call multiple tools in a single response. Make independent tool calls in parallel.
 
+# Task management
+ - Use TaskCreate, TaskUpdate, and TaskList tools to track complex multi-step tasks.
+ - Create tasks for complex work requiring 3+ steps. Mark as in_progress when starting, completed when done.
+
 # Tone and style
  - Only use emojis if the user explicitly requests it.
  - Your responses should be short and concise.
@@ -99,6 +108,15 @@ You are an interactive agent that helps users with software engineering tasks. U
         {"type", "text"},
         {"text", instructions}
     });
+
+    // Block 3: Auto memory
+    std::string auto_memory = memory_manager_.build_auto_memory_prompt();
+    if (!auto_memory.empty()) {
+        system.push_back({
+            {"type", "text"},
+            {"text", auto_memory}
+        });
+    }
 
     return system;
 }
@@ -127,10 +145,68 @@ json Agent::build_user_message(const std::string& user_input) const {
     };
 }
 
+bool Agent::handle_local_skill(const std::string& command, const std::string& args) {
+    if (command == "help") {
+        ui::append_text(skill_manager_.help_text());
+        ui::end_assistant_response();
+        return true;
+    }
+    if (command == "clear") {
+        messages_ = json::array();
+        ui::append_text("Conversation history cleared.");
+        ui::end_assistant_response();
+        return true;
+    }
+    if (command == "compact") {
+        json system_prompt = build_system_prompt();
+        json tools = tool_registry_.get_tool_definitions();
+        bool compressed = context_manager_.force_compress(messages_, system_prompt, tools, api_client_);
+        if (compressed) {
+            ui::append_text("Context compressed successfully.");
+        } else {
+            ui::append_text("Not enough context to compress.");
+        }
+        ui::end_assistant_response();
+        return true;
+    }
+    return false;
+}
+
 void Agent::process(const std::string& user_input) {
-    // Add user message with system-reminder injections
+    // Check for skill commands
+    if (skill_manager_.is_skill_command(user_input)) {
+        auto [command, args] = skill_manager_.parse(user_input);
+        auto* skill = skill_manager_.get(command);
+        if (!skill) {
+            ui::append_text("Unknown command: /" + command + "\n");
+            ui::append_text(skill_manager_.help_text());
+            ui::end_assistant_response();
+            return;
+        }
+        if (skill->is_local) {
+            if (handle_local_skill(command, args)) {
+                return;
+            }
+        } else {
+            // LLM skill: build prompt and process as normal message
+            std::string prompt = skill_manager_.build_prompt(command, args);
+            messages_.push_back(build_user_message(prompt));
+            agent_loop();
+            return;
+        }
+    }
+
+    // Normal message processing
     messages_.push_back(build_user_message(user_input));
     agent_loop();
+}
+
+std::vector<std::pair<std::string, std::string>> Agent::get_skill_list() const {
+    std::vector<std::pair<std::string, std::string>> result;
+    for (const auto& [name, skill] : skill_manager_.all()) {
+        result.emplace_back(name, skill.description);
+    }
+    return result;
 }
 
 json Agent::execute_tool_call(const json& tool_use_block) {
@@ -186,6 +262,10 @@ json Agent::execute_tool_call(const json& tool_use_block) {
         if (detail.length() > 80) detail = detail.substr(0, 80) + "...";
     } else if (input.contains("pattern")) {
         detail = input["pattern"].get<std::string>();
+    } else if (input.contains("subject")) {
+        detail = input["subject"].get<std::string>();
+    } else if (input.contains("taskId")) {
+        detail = "task #" + input["taskId"].get<std::string>();
     }
     ui::print_tool_call(tool_name, detail);
 
@@ -215,6 +295,9 @@ void Agent::agent_loop() {
     for (int iter = 0; iter < max_iterations; iter++) {
         json system_prompt = build_system_prompt();
         json tools = tool_registry_.get_tool_definitions();
+
+        // Check and compress context if needed
+        context_manager_.maybe_compress(messages_, system_prompt, tools, api_client_);
 
         ui::start_spinner("Thinking...");
 

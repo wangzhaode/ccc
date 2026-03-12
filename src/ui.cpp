@@ -234,12 +234,17 @@ void ui::run_tui(Agent& agent) {
               << "\033[90m" << cwd << "\033[0m\n";
     std::cout << "\n";
 
+    // Pre-fetch skill list for autocomplete
+    auto skill_list = agent.get_skill_list();
+
     while (true) {
         std::string user_input;
         bool exit_requested = false;
         int tw = term_width();
+        int selected_index = 0;
+        int last_render_lines = 4; // base: top_sep + input + bot_sep + hint
 
-        // === INPUT: FTXUI inline 4-line input box ===
+        // === INPUT: FTXUI inline input box with slash-command autocomplete ===
         auto screen = ScreenInteractive::FitComponent();
         screen.TrackMouse(false);
 
@@ -250,17 +255,53 @@ void ui::run_tui(Agent& agent) {
             }
             return state.element | color(Color::Default);
         };
+        input_option.on_change = [&]() {
+            selected_index = 0;
+        };
         Component input_box = Input(&user_input, "Try \"help me fix this bug...\"", input_option);
+
+        // Helper: get filtered candidates based on current input
+        auto get_candidates = [&]() -> std::vector<std::pair<std::string, std::string>> {
+            std::vector<std::pair<std::string, std::string>> candidates;
+            if (user_input.empty() || user_input[0] != '/') return candidates;
+            std::string prefix = user_input.substr(1); // strip leading '/'
+            for (const auto& [name, desc] : skill_list) {
+                if (prefix.empty() || name.find(prefix) == 0) {
+                    candidates.emplace_back(name, desc);
+                }
+            }
+            return candidates;
+        };
 
         auto render_func = [&] {
             std::string top_sep = build_top_sep(tw);
             std::string bot_sep = build_bot_sep(tw);
-            return vbox({
-                text(top_sep) | color(Color::GrayDark),
-                hbox({text("\u276f ") | bold | color(Color::Green), input_box->Render()}),
-                text(bot_sep) | color(Color::GrayDark),
-                text("  ? for shortcuts") | color(Color::GrayDark),
-            });
+
+            Elements lines;
+            lines.push_back(text(top_sep) | color(Color::GrayDark));
+            lines.push_back(hbox({text("\u276f ") | bold | color(Color::Green), input_box->Render()}));
+
+            // Render autocomplete candidates if input starts with '/'
+            auto candidates = get_candidates();
+            if (!candidates.empty()) {
+                for (int i = 0; i < (int)candidates.size(); i++) {
+                    std::string label = "  /" + candidates[i].first;
+                    std::string desc = "  - " + candidates[i].second;
+                    auto entry = hbox({
+                        text(label) | bold,
+                        text(desc) | color(Color::GrayDark),
+                    });
+                    if (i == selected_index) {
+                        entry = entry | inverted;
+                    }
+                    lines.push_back(entry);
+                }
+            }
+
+            lines.push_back(text(bot_sep) | color(Color::GrayDark));
+            lines.push_back(text("  ? for shortcuts") | color(Color::GrayDark));
+            last_render_lines = (int)lines.size();
+            return vbox(std::move(lines));
         };
 
         auto main_component = Renderer(input_box, render_func);
@@ -274,13 +315,32 @@ void ui::run_tui(Agent& agent) {
                 screen.ExitLoopClosure()();
                 return true;
             }
+
+            // Autocomplete keyboard handling
+            auto candidates = get_candidates();
+            bool has_candidates = !candidates.empty();
+
+            if (has_candidates && event == Event::Tab) {
+                // Fill input with selected candidate
+                user_input = "/" + candidates[selected_index].first + " ";
+                return true;
+            }
+            if (has_candidates && event == Event::ArrowUp) {
+                selected_index = (selected_index - 1 + (int)candidates.size()) % (int)candidates.size();
+                return true;
+            }
+            if (has_candidates && event == Event::ArrowDown) {
+                selected_index = (selected_index + 1) % (int)candidates.size();
+                return true;
+            }
+
             return false;
         });
 
         screen.Loop(main_component);
 
-        // Clear FTXUI's 4-line output
-        std::cout << "\033[4A\033[J" << std::flush;
+        // Clear FTXUI's output (dynamic height due to autocomplete candidates)
+        std::cout << "\033[" << last_render_lines << "A\033[J" << std::flush;
 
         if (exit_requested) break;
         if (user_input.empty()) continue;
