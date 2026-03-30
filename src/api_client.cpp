@@ -16,7 +16,7 @@ static json load_settings() {
     const char* home = std::getenv("HOME");
     if (!home) return json::object();
 
-    std::string path = std::string(home) + "/.cc/settings.json";
+    std::string path = std::string(home) + "/.ccc/settings.json";
     if (!std::filesystem::exists(path)) return json::object();
 
     std::ifstream file(path);
@@ -74,7 +74,7 @@ ApiClient::ApiClient() {
     debug_ = !get_env("CC_DEBUG").empty();
 
     if (api_key_.empty()) {
-        std::cerr << "Warning: API key not set. Configure ~/.cc/settings.json or set environment variables.\n";
+        std::cerr << "Warning: API key not set. Configure ~/.ccc/settings.json or set environment variables.\n";
     }
 }
 

@@ -30,15 +30,15 @@ std::string MemoryManager::find_project_root() const {
 std::vector<std::string> MemoryManager::get_config_paths() const {
     std::vector<std::string> paths;
 
-    // 1. Project root CC.md
+    // 1. Project root CCC.md
     if (!project_root_.empty()) {
-        paths.push_back(project_root_ + "/CC.md");
-        paths.push_back(project_root_ + "/.cc/CC.md");
+        paths.push_back(project_root_ + "/CCC.md");
+        paths.push_back(project_root_ + "/.ccc/CCC.md");
     }
 
-    // 2. User-level CC.md
+    // 2. User-level CCC.md
     if (!user_home_.empty()) {
-        paths.push_back(user_home_ + "/.cc/CC.md");
+        paths.push_back(user_home_ + "/.ccc/CCC.md");
     }
 
     return paths;
@@ -50,7 +50,7 @@ std::string MemoryManager::build_memory_prompt() const {
     for (const auto& path : get_config_paths()) {
         std::string content = load_file_if_exists(path);
         if (!content.empty()) {
-            result += "\n# CC.md (" + path + ")\n\n";
+            result += "\n# CCC.md (" + path + ")\n\n";
             result += content;
             result += "\n";
         }
@@ -76,7 +76,7 @@ std::string MemoryManager::auto_memory_dir() const {
         if (c == '/') c = '-';
     }
 
-    return user_home_ + "/.cc/projects/" + safe_path + "/memory/";
+    return user_home_ + "/.ccc/projects/" + safe_path + "/memory/";
 }
 
 std::string MemoryManager::load_file_lines(const std::string& path, int max_lines) const {

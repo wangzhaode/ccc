@@ -227,7 +227,7 @@ void ui::run_tui(Agent& agent) {
     // Banner: "ccc" pixel art logo + info (3 lines)
     std::cout << "\n";
     std::cout << "\033[1;36m\u2597\u2588\u2588\u2596 \u2597\u2588\u2588\u2596 \u2597\u2588\u2588\u2596\033[0m  "
-              << "\033[1mcc.cpp\033[0m \033[90mv0.1.0\033[0m\n";
+              << "\033[1mccc\033[0m \033[90mv0.1.0\033[0m\n";
     std::cout << "\033[1;36m\u2588\u2588   \u2588\u2588   \u2588\u2588\033[0m     "
               << "\033[90m" << agent.model() << "\033[0m\n";
     std::cout << "\033[1;36m\u259d\u2588\u2588\u2598 \u259d\u2588\u2588\u2598 \u259d\u2588\u2588\u2598\033[0m  "

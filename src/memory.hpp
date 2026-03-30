@@ -7,7 +7,7 @@ class MemoryManager {
 public:
     MemoryManager();
 
-    // Build the memory section for system prompt (CC.md files)
+    // Build the memory section for system prompt (CCC.md files)
     std::string build_memory_prompt() const;
 
     // Auto memory: load MEMORY.md from project memory directory
@@ -23,7 +23,7 @@ private:
     std::string project_root_;
     std::string user_home_;
 
-    // Find and load CC.md files
+    // Find and load CCC.md files
     std::string load_file_if_exists(const std::string& path) const;
     std::string find_project_root() const;
     std::vector<std::string> get_config_paths() const;

@@ -2,7 +2,7 @@
 
 ## 概述
 
-cc.cpp 使用 CMake 构建系统，采用 C++17 标准，通过 FetchContent 管理第三方依赖，无需手动下载或安装外部库。
+ccc 使用 CMake 构建系统，采用 C++17 标准，通过 FetchContent 管理第三方依赖，无需手动下载或安装外部库。
 
 ---
 
@@ -114,9 +114,9 @@ endfunction()
 ## 项目目录结构
 
 ```
-cc.cpp/
+ccc/
 ├── CMakeLists.txt          # 顶层 CMake 配置
-├── CC.md                   # 项目记忆文件（自动注入到 system prompt）
+├── CCC.md                   # 项目记忆文件（自动注入到 system prompt）
 ├── docs/                   # 文档目录
 │   └── 01-core-features.md # 核心功能拆解
 ├── include/                # 公共头文件目录（当前为空，预留扩展）
@@ -125,7 +125,7 @@ cc.cpp/
 │   ├── agent.h/cpp         # Agent Loop 核心逻辑
 │   ├── api_client.h/cpp    # LLM API 客户端
 │   ├── tool.h              # 工具基类和注册表
-│   ├── memory.h/cpp        # 记忆系统（CC.md 加载）
+│   ├── memory.h/cpp        # 记忆系统（CCC.md 加载）
 │   ├── permission.h/cpp    # 权限管理
 │   └── tools/              # 内置工具实现
 │       ├── read_tool.h/cpp
@@ -192,7 +192,7 @@ cmake -B build && cmake --build build
 
 ### 配置文件
 
-运行前需要在 `~/.cc/settings.json` 中配置 API 接入信息：
+运行前需要在 `~/.ccc/settings.json` 中配置 API 接入信息：
 
 ```json
 {

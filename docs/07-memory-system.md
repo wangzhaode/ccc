@@ -2,15 +2,15 @@
 
 ## 概述
 
-记忆系统负责加载 CC.md 文件并将其内容注入到 LLM 的 system prompt 中。通过这个机制，LLM 在每次对话中都能获取项目的上下文信息、编码规范和工作指引。
+记忆系统负责加载 CCC.md 文件并将其内容注入到 LLM 的 system prompt 中。通过这个机制，LLM 在每次对话中都能获取项目的上下文信息、编码规范和工作指引。
 
-cc.cpp 使用自己的配置目录 `~/.cc/`，与 Claude Code 的 `~/.claude/` 互不干扰。
+ccc 使用自己的配置目录 `~/.ccc/`，与 Claude Code 的 `~/.claude/` 互不干扰。
 
 ---
 
-## CC.md 的作用
+## CCC.md 的作用
 
-CC.md 本质上是一个**自动注入的提示词文件**。用户在文件中写下项目相关的说明和规则，系统启动时自动读取并作为 system prompt 的一部分发送给 LLM。
+CCC.md 本质上是一个**自动注入的提示词文件**。用户在文件中写下项目相关的说明和规则，系统启动时自动读取并作为 system prompt 的一部分发送给 LLM。
 
 典型内容包括：
 - 项目描述和技术栈
@@ -49,22 +49,22 @@ private:
 
 ---
 
-## CC.md 加载路径
+## CCC.md 加载路径
 
-`get_config_paths()` 返回按优先级排列的 CC.md 搜索路径：
+`get_config_paths()` 返回按优先级排列的 CCC.md 搜索路径：
 
 | 优先级 | 路径 | 说明 |
 |--------|------|------|
-| 1 | `<项目根目录>/CC.md` | 项目级配置，放在项目根目录 |
-| 2 | `<项目根目录>/.cc/CC.md` | 项目级配置，放在 .cc 子目录（避免根目录杂乱） |
-| 3 | `~/.cc/CC.md` | 用户级配置，跨项目共享 |
+| 1 | `<项目根目录>/CCC.md` | 项目级配置，放在项目根目录 |
+| 2 | `<项目根目录>/.ccc/CCC.md` | 项目级配置，放在 .ccc 子目录（避免根目录杂乱） |
+| 3 | `~/.ccc/CCC.md` | 用户级配置，跨项目共享 |
 
 ### 多路径合并
 
-**所有存在的 CC.md 文件都会被加载**，内容依次拼接。这意味着可以同时使用项目级和用户级配置：
+**所有存在的 CCC.md 文件都会被加载**，内容依次拼接。这意味着可以同时使用项目级和用户级配置：
 
-- 项目 CC.md：定义项目特定的规范
-- 用户 CC.md：定义个人偏好和全局规则
+- 项目 CCC.md：定义项目特定的规范
+- 用户 CCC.md：定义个人偏好和全局规则
 
 ### 文件读取
 
@@ -79,13 +79,13 @@ std::string load_file_if_exists(const std::string& path) const {
 }
 ```
 
-对于不存在或无法打开的文件，静默返回空字符串，不报错。这保证了系统在没有 CC.md 的项目中也能正常运行。
+对于不存在或无法打开的文件，静默返回空字符串，不报错。这保证了系统在没有 CCC.md 的项目中也能正常运行。
 
 ---
 
 ## System Prompt 注入
 
-`build_memory_prompt()` 方法将所有找到的 CC.md 内容合并为一段文本：
+`build_memory_prompt()` 方法将所有找到的 CCC.md 内容合并为一段文本：
 
 ```cpp
 std::string build_memory_prompt() const {
@@ -93,7 +93,7 @@ std::string build_memory_prompt() const {
     for (const auto& path : get_config_paths()) {
         std::string content = load_file_if_exists(path);
         if (!content.empty()) {
-            result += "\n# CC.md (" + path + ")\n\n";
+            result += "\n# CCC.md (" + path + ")\n\n";
             result += content;
             result += "\n";
         }
@@ -114,7 +114,7 @@ System Prompt 结构：
 ├─ 环境信息（工作目录、操作系统）
 ├─ 工具使用指南（固定文本）
 └─ # Project Instructions
-    └─ CC.md 内容（由 MemoryManager 提供）
+    └─ CCC.md 内容（由 MemoryManager 提供）
 ```
 
 只有当 `build_memory_prompt()` 返回非空内容时，才会添加 `# Project Instructions` 部分。
@@ -123,21 +123,21 @@ System Prompt 结构：
 
 ## 配置目录结构
 
-cc.cpp 的所有配置统一存放在 `~/.cc/` 目录下：
+ccc 的所有配置统一存放在 `~/.ccc/` 目录下：
 
 ```
-~/.cc/
+~/.ccc/
 ├── settings.json    ← API 配置（api_key, base_url, model, provider）
-└── CC.md            ← 用户级记忆文件（可选）
+└── CCC.md            ← 用户级记忆文件（可选）
 ```
 
 项目级配置：
 
 ```
 <项目根目录>/
-├── CC.md            ← 项目级记忆文件
-└── .cc/
-    └── CC.md        ← 项目级记忆文件（隐藏目录方式）
+├── CCC.md            ← 项目级记忆文件
+└── .ccc/
+    └── CCC.md        ← 项目级记忆文件（隐藏目录方式）
 ```
 
 ---
@@ -160,7 +160,7 @@ std::string find_project_root() const {
 - `.git/` 目录
 - `CMakeLists.txt`
 - `package.json`
-- `.cc/` 目录
+- `.ccc/` 目录
 
 ---
 
@@ -168,8 +168,8 @@ std::string find_project_root() const {
 
 `build_memory_prompt()` 在每次 Agent Loop 迭代中都会被调用（通过 `build_system_prompt()`），而非仅在启动时加载一次。这意味着：
 
-- 如果用户在会话过程中修改了 CC.md，**下次 LLM 调用就能看到更新**
-- 代价是每次迭代都有文件 I/O 开销，但 CC.md 通常很小，影响可忽略
+- 如果用户在会话过程中修改了 CCC.md，**下次 LLM 调用就能看到更新**
+- 代价是每次迭代都有文件 I/O 开销，但 CCC.md 通常很小，影响可忽略
 
 ---
 
@@ -179,9 +179,9 @@ std::string find_project_root() const {
 
 ```
 /home/user/project/
-├── CC.md             ← 内容："这是一个 Python 项目，使用 pytest 测试"
-├── .cc/
-│   └── CC.md         ← 内容："优先使用 type hints"
+├── CCC.md             ← 内容："这是一个 Python 项目，使用 pytest 测试"
+├── .ccc/
+│   └── CCC.md         ← 内容："优先使用 type hints"
 └── src/
     └── ...
 ```
@@ -190,23 +190,23 @@ std::string find_project_root() const {
 
 ```
 /home/user/
-└── .cc/
+└── .ccc/
     ├── settings.json  ← API 配置
-    └── CC.md          ← 内容："回复使用中文"
+    └── CCC.md          ← 内容："回复使用中文"
 ```
 
 那么 `build_memory_prompt()` 的输出为：
 
 ```
-# CC.md (/home/user/project/CC.md)
+# CCC.md (/home/user/project/CCC.md)
 
 这是一个 Python 项目，使用 pytest 测试
 
-# CC.md (/home/user/project/.cc/CC.md)
+# CCC.md (/home/user/project/.ccc/CCC.md)
 
 优先使用 type hints
 
-# CC.md (/home/user/.cc/CC.md)
+# CCC.md (/home/user/.ccc/CCC.md)
 
 回复使用中文
 ```

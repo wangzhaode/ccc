@@ -40,7 +40,7 @@ json Agent::build_system_prompt() const {
     // Block 1: Role definition
     system.push_back({
         {"type", "text"},
-        {"text", "You are cc.cpp, a CLI-based AI coding assistant."}
+        {"text", "You are ccc, a CLI-based AI coding assistant."}
     });
 
     // Block 2: Main instructions (the big one)
@@ -124,7 +124,7 @@ You are an interactive agent that helps users with software engineering tasks. U
 json Agent::build_user_message(const std::string& user_input) const {
     json content = json::array();
 
-    // Inject memory (CC.md) as system-reminder
+    // Inject memory (CCC.md) as system-reminder
     std::string memory = memory_manager_.build_memory_prompt();
     if (!memory.empty()) {
         content.push_back({

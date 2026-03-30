@@ -34,7 +34,7 @@ TEST_F(MemoryTest, AutoMemoryDirNotEmpty) {
     MemoryManager mm;
     std::string dir = mm.auto_memory_dir();
     EXPECT_FALSE(dir.empty());
-    EXPECT_NE(dir.find("/.cc/projects/"), std::string::npos);
+    EXPECT_NE(dir.find("/.ccc/projects/"), std::string::npos);
     EXPECT_NE(dir.find("/memory/"), std::string::npos);
 }
 
