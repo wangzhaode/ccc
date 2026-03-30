@@ -2,6 +2,8 @@
 
 ccc（**C**laude **C**ode in **C**++）是一个用 C++ 实现的 Claude Code 命令行工具，通过实现一个功能相似的 CLI 工具来学习和理解 Claude Code 的工作原理。
 
+> 🤖 **自我演进项目** — 从 [d16885e](https://github.com/wangzhaode/ccc/commit/d16885eff973705b1ddaf3c6e884a439e259fb26) 这个 commit 开始，本项目的后续修改将由 ccc 自身完成。这是一个 AI 辅助编程的实践：用 ccc 来开发和改进 ccc。
+
 ![ccc](ccc.jpg)
 
 ## 功能特性
