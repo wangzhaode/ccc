@@ -187,10 +187,21 @@ ApiResponse ApiClient::chat_anthropic(
 
     ApiResponse result;
     json content_blocks = json::array();
-    std::string current_tool_json;
+    // Track tool JSON per index for interleaved streaming (some APIs send
+    // start events for multiple tool_use blocks before sending their stops)
+    std::map<int, std::string> tool_json_by_index;
+    std::map<int, int> index_to_block;  // SSE index -> content_blocks position
+
+    if (debug_) {
+        std::ofstream sse_dump("/tmp/ccc_sse_debug.txt");
+        sse_dump << res->body;
+        sse_dump.close();
+        debug_print("SSE_BODY_LENGTH", std::to_string(res->body.size()));
+    }
 
     parse_sse_lines(res->body, [&](const json& event) {
         std::string type = event.value("type", "");
+        int idx = event.value("index", -1);
 
         if (type == "message_start") {
             if (event.contains("message") && event["message"].contains("usage")) {
@@ -200,36 +211,44 @@ ApiResponse ApiClient::chat_anthropic(
             json block = event["content_block"];
             std::string block_type = block.value("type", "");
             if (block_type == "text") {
+                index_to_block[idx] = (int)content_blocks.size();
                 content_blocks.push_back({{"type", "text"}, {"text", ""}});
             } else if (block_type == "tool_use") {
+                index_to_block[idx] = (int)content_blocks.size();
                 content_blocks.push_back({
                     {"type", "tool_use"},
                     {"id", block.value("id", "")},
                     {"name", block.value("name", "")},
-                    {"input", json::object()}
+                    {"input", block.value("input", json::object())}
                 });
-                current_tool_json = "";
+                tool_json_by_index[idx] = "";
             }
         } else if (type == "content_block_delta") {
             json delta = event["delta"];
             std::string delta_type = delta.value("type", "");
             if (delta_type == "text_delta") {
                 std::string text = delta.value("text", "");
-                if (!content_blocks.empty() && content_blocks.back()["type"] == "text") {
-                    content_blocks.back()["text"] = content_blocks.back()["text"].get<std::string>() + text;
+                auto it = index_to_block.find(idx);
+                if (it != index_to_block.end() && it->second < (int)content_blocks.size()) {
+                    content_blocks[it->second]["text"] = content_blocks[it->second]["text"].get<std::string>() + text;
                 }
                 if (on_text) on_text(text);
             } else if (delta_type == "input_json_delta") {
-                current_tool_json += delta.value("partial_json", "");
+                tool_json_by_index[idx] += delta.value("partial_json", "");
             }
         } else if (type == "content_block_stop") {
-            if (!content_blocks.empty() && content_blocks.back()["type"] == "tool_use") {
-                try {
-                    if (!current_tool_json.empty()) {
-                        content_blocks.back()["input"] = json::parse(current_tool_json);
+            auto it = index_to_block.find(idx);
+            if (it != index_to_block.end() && it->second < (int)content_blocks.size()) {
+                auto& block = content_blocks[it->second];
+                if (block["type"] == "tool_use") {
+                    auto& tool_json = tool_json_by_index[idx];
+                    try {
+                        if (!tool_json.empty()) {
+                            block["input"] = json::parse(tool_json);
+                        }
+                    } catch (...) {
+                        block["input"] = json::object();
                     }
-                } catch (...) {
-                    content_blocks.back()["input"] = json::object();
                 }
             }
         } else if (type == "message_delta") {

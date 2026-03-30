@@ -35,16 +35,9 @@ void Agent::register_tools() {
 }
 
 json Agent::build_system_prompt() const {
-    json system = json::array();
+    std::string system_str = "You are ccc, a CLI-based AI coding assistant.\n";
 
-    // Block 1: Role definition
-    system.push_back({
-        {"type", "text"},
-        {"text", "You are ccc, a CLI-based AI coding assistant."}
-    });
-
-    // Block 2: Main instructions (the big one)
-    std::string instructions = R"(
+    system_str += R"(
 You are an interactive agent that helps users with software engineering tasks. Use the instructions below and the tools available to you to assist the user.
 
 # System
@@ -104,21 +97,13 @@ You are an interactive agent that helps users with software engineering tasks. U
     + R"(
  - Shell: )" + std::string(std::getenv("SHELL") ? std::getenv("SHELL") : "unknown") + "\n";
 
-    system.push_back({
-        {"type", "text"},
-        {"text", instructions}
-    });
-
-    // Block 3: Auto memory
+    // Append auto memory
     std::string auto_memory = memory_manager_.build_auto_memory_prompt();
     if (!auto_memory.empty()) {
-        system.push_back({
-            {"type", "text"},
-            {"text", auto_memory}
-        });
+        system_str += "\n" + auto_memory;
     }
 
-    return system;
+    return system_str;
 }
 
 json Agent::build_user_message(const std::string& user_input) const {
