@@ -6,13 +6,20 @@
 int main(int argc, char* argv[]) {
     Agent agent;
 
-    // Support single-shot mode from command line
-    if (argc > 1) {
-        std::string input;
-        for (int i = 1; i < argc; i++) {
-            if (i > 1) input += " ";
-            input += argv[i];
+    // Parse flags and collect non-flag arguments
+    std::string input;
+    for (int i = 1; i < argc; i++) {
+        std::string arg = argv[i];
+        if (arg == "-y" || arg == "--auto-accept") {
+            agent.set_auto_accept(true);
+        } else {
+            if (!input.empty()) input += " ";
+            input += arg;
         }
+    }
+
+    // Support single-shot mode from command line
+    if (!input.empty()) {
         agent.process(input);
         return 0;
     }

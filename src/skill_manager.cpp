@@ -27,6 +27,13 @@ void SkillManager::register_builtin_skills() {
         true  // local
     };
 
+    skills_["yolo"] = {
+        "yolo",
+        "Toggle auto-accept all tool permissions",
+        "",
+        true  // local
+    };
+
     skills_["commit"] = {
         "commit",
         "Analyze changes and generate a git commit",

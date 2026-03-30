@@ -26,6 +26,9 @@ public:
     // Get list of skill commands: [(name, description), ...]
     std::vector<std::pair<std::string, std::string>> get_skill_list() const;
 
+    // Auto-accept all tool permissions without prompting
+    void set_auto_accept(bool enabled) { permission_manager_.set_auto_accept(enabled); }
+
 private:
     ApiClient api_client_;
     TaskManager task_manager_;        // Must be before tool_registry_

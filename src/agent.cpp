@@ -154,6 +154,14 @@ bool Agent::handle_local_skill(const std::string& command, const std::string& ar
         ui::end_assistant_response();
         return true;
     }
+    if (command == "yolo") {
+        bool enabled = !permission_manager_.auto_accept();
+        permission_manager_.set_auto_accept(enabled);
+        ui::append_text(enabled ? "Auto-accept enabled. All tools will run without confirmation."
+                                : "Auto-accept disabled. Tools will ask for confirmation.");
+        ui::end_assistant_response();
+        return true;
+    }
     return false;
 }
 

@@ -3,6 +3,11 @@
 #include <iostream>
 
 bool PermissionManager::check_and_request(const std::string& tool_name, const json& params, PermissionLevel level) {
+    // If auto-accept is enabled, allow everything
+    if (auto_accept_all_) {
+        return true;
+    }
+
     // Auto-allow tools don't need confirmation
     if (level == PermissionLevel::AutoAllow) {
         return true;
