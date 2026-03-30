@@ -30,4 +30,4 @@ void print_permission_header(const std::string& tool_name, const std::string& de
 void print_permission_prompt(const std::string& tool_name);
 char prompt_permission(const std::string& tool_name, const std::string& detail);
 
-} // namespace ui
+}  // namespace ui
