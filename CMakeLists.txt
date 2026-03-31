@@ -1,19 +1,19 @@
 cmake_minimum_required(VERSION 3.14)
 
-# Enable new MSVC runtime library behavior BEFORE project()
-cmake_policy(SET CMP0091 NEW)
-
 project(cc_cpp VERSION 0.1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Windows: Use STATIC runtime library (/MT) for all targets to avoid CRT mismatch
-# This ensures all code links against the same static CRT
+# Windows: Use static runtime library (/MT) for all targets
 if(MSVC)
-    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-    # Google Test should also use static CRT
+    # Replace default /MD with /MT for all build configurations
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MT")
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MTd")
+    set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /MT")
+    set(CMAKE_CXX_FLAGS_MINSIZEREL "${CMAKE_CXX_FLAGS_MINSIZEREL} /MT")
+    # Google Test should also use static CRT (default behavior)
     set(gtest_force_shared_crt OFF CACHE BOOL "" FORCE)
 endif()
 
