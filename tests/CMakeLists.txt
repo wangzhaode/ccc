@@ -1,3 +1,8 @@
+# Force Google Test to use shared CRT (/MD) on Windows to match our settings
+if(MSVC)
+    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+endif()
+
 FetchContent_Declare(
     googletest
     GIT_REPOSITORY https://github.com/google/googletest.git
