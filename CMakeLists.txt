@@ -5,9 +5,12 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Windows: Use dynamic runtime library (/MD) for consistency with dependencies
+# Windows: Use dynamic runtime library (/MD) for consistency across all targets
+# Must be set BEFORE FetchContent to apply to dependencies
 if(MSVC)
-    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL" CACHE STRING "" FORCE)
+    # Also set for static libraries (FTXUI builds as static)
+    set(CMAKE_POLICY_DEFAULT_CMP0091 NEW)
 endif()
 
 # Find OpenSSL for HTTPS support
