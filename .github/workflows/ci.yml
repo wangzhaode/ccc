@@ -75,7 +75,7 @@ jobs:
           echo "OPENSSL_ROOT_DIR=C:\Program Files\OpenSSL-Win64" >> $env:GITHUB_ENV
 
       - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_DEFAULT_CMP0091=NEW
 
       - name: Build
         run: cmake --build build --config Release -j

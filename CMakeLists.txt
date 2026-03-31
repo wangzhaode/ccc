@@ -1,8 +1,5 @@
 cmake_minimum_required(VERSION 3.14)
 
-# Use CMP0091 NEW behavior for MSVC runtime library selection
-cmake_policy(SET CMP0091 NEW)
-
 project(cc_cpp VERSION 0.1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -12,8 +9,10 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Windows: Use dynamic runtime library (/MD) for consistency across all targets
 if(MSVC)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
-    # Force Google Test to use shared CRT
+    # Force Google Test to use shared CRT (must be set before FetchContent)
     set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+    # Force all static libraries to use shared CRT
+    set(CMAKE_POLICY_DEFAULT_CMP0091 NEW)
 endif()
 
 # Find OpenSSL for HTTPS support
