@@ -9,11 +9,12 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Windows: Use dynamic runtime library (/MD) for all targets
+# Windows: Use STATIC runtime library (/MT) for all targets to avoid CRT mismatch
+# This ensures all code links against the same static CRT
 if(MSVC)
-    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
-    # Force Google Test to use shared CRT (must be before FetchContent)
-    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    # Google Test should also use static CRT
+    set(gtest_force_shared_crt OFF CACHE BOOL "" FORCE)
 endif()
 
 # Find OpenSSL for HTTPS support
