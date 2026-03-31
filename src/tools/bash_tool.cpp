@@ -3,9 +3,141 @@
 #include <array>
 #include <memory>
 #include <sstream>
+
+#ifdef _WIN32
+#include <windows.h>
+#include <chrono>
+#include <thread>
+
+ToolResult BashTool::execute(const json& params) {
+  std::string command = params.at("command").get<std::string>();
+  int timeout_ms = params.value("timeout", 120000);
+
+  // Create pipes for capturing output
+  HANDLE hReadPipe, hWritePipe;
+  SECURITY_ATTRIBUTES sa;
+  sa.nLength = sizeof(SECURITY_ATTRIBUTES);
+  sa.bInheritHandle = TRUE;
+  sa.lpSecurityDescriptor = nullptr;
+
+  if (!CreatePipe(&hReadPipe, &hWritePipe, &sa, 0)) {
+    return {"Error: Failed to create pipe", true};
+  }
+  SetHandleInformation(hReadPipe, HANDLE_FLAG_INHERIT, 0);
+
+  // Set up process info
+  STARTUPINFOA si;
+  PROCESS_INFORMATION pi;
+  ZeroMemory(&si, sizeof(si));
+  si.cb = sizeof(si);
+  si.hStdError = hWritePipe;
+  si.hStdOutput = hWritePipe;
+  si.dwFlags |= STARTF_USESTDHANDLES;
+
+  ZeroMemory(&pi, sizeof(pi));
+
+  // Use cmd.exe to run the command
+  std::string cmd = "cmd /c " + command;
+
+  // CreateProcess requires a mutable string
+  char* cmdLine = new char[cmd.size() + 1];
+  strcpy(cmdLine, cmd.c_str());
+
+  BOOL success = CreateProcessA(
+      nullptr,
+      cmdLine,
+      nullptr,
+      nullptr,
+      TRUE,
+      0,
+      nullptr,
+      nullptr,
+      &si,
+      &pi
+  );
+
+  delete[] cmdLine;
+  CloseHandle(hWritePipe);
+
+  if (!success) {
+    CloseHandle(hReadPipe);
+    return {"Error: Failed to create process", true};
+  }
+
+  // Read output with timeout
+  std::string output;
+  std::array<char, 4096> buffer;
+  DWORD bytesRead;
+  bool timed_out = false;
+
+  auto start = std::chrono::steady_clock::now();
+
+  while (true) {
+    DWORD available = 0;
+    if (!PeekNamedPipe(hReadPipe, nullptr, 0, nullptr, &available, nullptr)) {
+      break;
+    }
+
+    if (available == 0) {
+      // Check if process has terminated
+      DWORD exitCode;
+      if (GetExitCodeProcess(pi.hProcess, &exitCode) && exitCode != STILL_ACTIVE) {
+        // Read any remaining data
+        while (ReadFile(hReadPipe, buffer.data(), static_cast<DWORD>(buffer.size()), &bytesRead, nullptr) && bytesRead > 0) {
+          output.append(buffer.data(), bytesRead);
+        }
+        break;
+      }
+
+      auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                         std::chrono::steady_clock::now() - start)
+                         .count();
+      if (elapsed >= timeout_ms) {
+        timed_out = true;
+        break;
+      }
+
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      continue;
+    }
+
+    if (!ReadFile(hReadPipe, buffer.data(), static_cast<DWORD>(buffer.size()), &bytesRead, nullptr) || bytesRead == 0) {
+      break;
+    }
+    output.append(buffer.data(), bytesRead);
+
+    if (output.size() > 1024 * 1024) {
+      output += "\n... (output truncated at 1MB)";
+      break;
+    }
+  }
+
+  CloseHandle(hReadPipe);
+
+  if (timed_out) {
+    TerminateProcess(pi.hProcess, 1);
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+    return {"Error: Command timed out after " + std::to_string(timeout_ms) + "ms\n" + output, true};
+  }
+
+  DWORD exitCode;
+  GetExitCodeProcess(pi.hProcess, &exitCode);
+  CloseHandle(pi.hProcess);
+  CloseHandle(pi.hThread);
+
+  if (exitCode != 0) {
+    return {"Exit code: " + std::to_string(exitCode) + "\n" + output, true};
+  }
+
+  return {output, false};
+}
+
+#else
 #include <signal.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <sys/select.h>
 
 ToolResult BashTool::execute(const json& params) {
   std::string command = params.at("command").get<std::string>();
@@ -43,10 +175,8 @@ ToolResult BashTool::execute(const json& params) {
   std::array<char, 4096> buffer;
   bool timed_out = false;
 
-  // Set up timeout using alarm-like mechanism
   auto start = std::chrono::steady_clock::now();
 
-  // Make pipe non-blocking would be complex, use simple read loop
   fd_set fds;
   struct timeval tv;
 
@@ -79,7 +209,6 @@ ToolResult BashTool::execute(const json& params) {
       break;
     output.append(buffer.data(), n);
 
-    // Limit output size to 1MB
     if (output.size() > 1024 * 1024) {
       output += "\n... (output truncated at 1MB)";
       break;
@@ -106,3 +235,4 @@ ToolResult BashTool::execute(const json& params) {
 
   return {output, false};
 }
+#endif

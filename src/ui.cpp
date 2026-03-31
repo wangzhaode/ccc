@@ -7,13 +7,18 @@
 #include <ftxui/screen/screen.hpp>
 #include <ftxui/screen/color.hpp>
 #include <filesystem>
-#include <sys/ioctl.h>
 #include <cstdlib>
-#include <unistd.h>
 #include <thread>
 #include <atomic>
 #include <chrono>
 #include <mutex>
+
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <sys/ioctl.h>
+#include <unistd.h>
+#endif
 
 using namespace ftxui;
 
@@ -27,17 +32,41 @@ const char* spinner_frames[] = {"\u2847", "\u2819", "\u2839", "\u2838", "\u283c"
                                 "\u2834", "\u2826", "\u2827", "\u2807", "\u280f"};
 
 static int term_width() {
+#ifdef _WIN32
+  HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+  if (hConsole != INVALID_HANDLE_VALUE) {
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    if (GetConsoleScreenBufferInfo(hConsole, &csbi)) {
+      int width = csbi.srWindow.Right - csbi.srWindow.Left + 1;
+      return width > 0 ? width : 80;
+    }
+  }
+  return 80;
+#else
   struct winsize w;
   if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == 0 && w.ws_col > 0)
     return w.ws_col;
   return 80;
+#endif
 }
 
 static int term_height() {
+#ifdef _WIN32
+  HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+  if (hConsole != INVALID_HANDLE_VALUE) {
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    if (GetConsoleScreenBufferInfo(hConsole, &csbi)) {
+      int height = csbi.srWindow.Bottom - csbi.srWindow.Top + 1;
+      return height > 0 ? height : 24;
+    }
+  }
+  return 24;
+#else
   struct winsize w;
   if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == 0 && w.ws_row > 0)
     return w.ws_row;
   return 24;
+#endif
 }
 
 static const int FOOTER_LINES = 4;  // top_sep + input + bot_sep + hint
@@ -215,7 +244,11 @@ char ui::prompt_permission(const std::string& tool_name, const std::string& deta
 
 void ui::run_tui(Agent& agent) {
   std::string cwd = std::filesystem::current_path().string();
+#ifdef _WIN32
+  const char* home = std::getenv("USERPROFILE");
+#else
   const char* home = std::getenv("HOME");
+#endif
   if (home && cwd.find(home) == 0) {
     cwd = "~" + cwd.substr(std::string(home).length());
   }
